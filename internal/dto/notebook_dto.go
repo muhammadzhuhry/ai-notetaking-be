@@ -16,9 +16,18 @@ type CreateNotebookResponse struct {
 }
 
 type ShowNotebookResponse struct {
-	Id        string     `json:"id"`
+	Id        uuid.UUID  `json:"id"`
 	Name      string     `json:"name"`
 	ParentId  *uuid.UUID `json:"parent_id,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+}
+
+type UpdateNotebookRequest struct {
+	Id   uuid.UUID
+	Name string `json:"name" validate:"required"`
+}
+
+type UpdateNotebookResponse struct {
+	Id uuid.UUID `json:"id"`
 }
