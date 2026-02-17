@@ -16,6 +16,7 @@ type INoteRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository
 	Create(ctx context.Context, note *entity.Note) error
 	GetById(ctx context.Context, id uuid.UUID) (*entity.Note, error)
+	Update(ctx context.Context, note *entity.Note) error
 }
 
 type noteRepository struct {
@@ -72,6 +73,24 @@ func (n *noteRepository) GetById(ctx context.Context, id uuid.UUID) (*entity.Not
 	}
 
 	return &note, nil
+}
+
+func (n *noteRepository) Update(ctx context.Context, note *entity.Note) error {
+	_, err := n.db.Exec(
+		ctx,
+		`UPDATE notes SET title = $1, content = $2, notebook_id = $3, updated_at = $4 WHERE id = $5`,
+		note.Title,
+		note.Content,
+		note.NotebookId,
+		note.UpdatedAt,
+		note.Id,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Factory function
