@@ -6,11 +6,13 @@ import (
 	"ai-notetaking-be/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type INoteController interface {
 	RegisterRoutes(r fiber.Router)
 	Create(ctx *fiber.Ctx) error
+	Show(ctx *fiber.Ctx) error
 }
 
 type noteController struct {
@@ -26,6 +28,7 @@ func NewNoteController(noteService service.INoteService) INoteController {
 func (c *noteController) RegisterRoutes(r fiber.Router) {
 	h := r.Group("/note/v1")
 	h.Post("", c.Create)
+	h.Get("/:id", c.Show)
 }
 
 func (c *noteController) Create(ctx *fiber.Ctx) error {
@@ -45,4 +48,16 @@ func (c *noteController) Create(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(serverutils.SuccessResponse("Success created note", res))
+}
+
+func (c *noteController) Show(ctx *fiber.Ctx) error {
+	idParam := ctx.Params("id")
+	id, _ := uuid.Parse(idParam)
+
+	res, err := c.noteService.Show(ctx.Context(), id)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse("Success show note", res))
 }
