@@ -24,3 +24,13 @@ type ShowNoteResponse struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  *time.Time `json:"updated_at"`
 }
+
+type UpdateNoteRequest struct {
+	Id      uuid.UUID `json:"id" validate:"required"`
+	Title   string    `json:"title" validate:"required"`
+	Content string    `json:"content"`
+}
+
+type UpdateNoteResponse struct {
+	Id uuid.UUID `json:"id"`
+}
