@@ -6,6 +6,8 @@ import (
 	"ai-notetaking-be/pkg/database"
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +19,7 @@ type INoteRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) INoteRepository
 	Create(ctx context.Context, note *entity.Note) error
 	GetById(ctx context.Context, id uuid.UUID) (*entity.Note, error)
+	GetByNotebookIds(ctx context.Context, ids []uuid.UUID) ([]*entity.Note, error)
 	Update(ctx context.Context, note *entity.Note) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteByNotebookId(ctx context.Context, notebookId uuid.UUID) error
@@ -120,6 +123,47 @@ func (n *noteRepository) DeleteByNotebookId(ctx context.Context, notebookId uuid
 		return err
 	}
 	return nil
+}
+
+func (n *noteRepository) GetByNotebookIds(ctx context.Context, ids []uuid.UUID) ([]*entity.Note, error) {
+	if len(ids) == 0 {
+		return make([]*entity.Note, 0), nil
+	}
+
+	idStr := make([]string, 0)
+	for _, id := range ids {
+		idStr = append(idStr, fmt.Sprintf("'%s'", id.String()))
+	}
+	idStrJoined := strings.Join(idStr, ", ")
+
+	rows, err := n.db.Query(
+		ctx,
+		fmt.Sprintf(`SELECT id, title, content, notebook_id, created_at, updated_at FROM notes WHERE notebook_id IN (%s) AND is_deleted = false`, idStrJoined),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*entity.Note, 0)
+	for rows.Next() {
+		var note entity.Note
+
+		err = rows.Scan(
+			&note.Id,
+			&note.Title,
+			&note.Content,
+			&note.NotebookId,
+			&note.CreatedAt,
+			&note.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, &note)
+	}
+
+	return result, nil
 }
 
 // Factory function
