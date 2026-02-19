@@ -6,6 +6,7 @@ import (
 	"ai-notetaking-be/internal/repository"
 	"ai-notetaking-be/internal/service"
 	"ai-notetaking-be/pkg/database"
+	"context"
 	"log"
 	"os"
 
@@ -32,11 +33,17 @@ func main() {
 	notebookRepository := repository.NewNotebookRepository(db)
 	noteRepository := repository.NewNoteRepository(db)
 
+	// Initialize watermill publisher and consumer services
 	watermillLogger := watermill.NewStdLogger(false, false)
 	pubSub := gochannel.NewGoChannel(gochannel.Config{}, watermillLogger)
 	publisherService := service.NewPublisherService(
 		"embed-note-content",
 		pubSub,
+	)
+
+	consumerService := service.NewConsumerService(
+		pubSub,
+		"embed-note-content",
 	)
 
 	exampleService := service.NewExampleService(exampleRepository)
@@ -51,6 +58,11 @@ func main() {
 	exampleController.RegisterRoutes(api)
 	notebookController.RegisterRoutes(api)
 	noteController.RegisterRoutes(api)
+
+	err := consumerService.Consume(context.Background())
+	if err != nil {
+		panic(err)
+	}
 
 	log.Fatal(app.Listen(":3000"))
 }
