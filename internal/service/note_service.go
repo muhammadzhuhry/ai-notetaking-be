@@ -5,6 +5,7 @@ import (
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,13 +20,14 @@ type INoteService interface {
 }
 
 type noteService struct {
-	noteRepository repository.INoteRepository
-	// db                 *pgxpool.Pool
+	noteRepository  repository.INoteRepository
+	publiserService IPublisherService
 }
 
-func NewNoteService(noteRepository repository.INoteRepository) INoteService {
+func NewNoteService(noteRepository repository.INoteRepository, publisherService IPublisherService) INoteService {
 	return &noteService{
-		noteRepository: noteRepository,
+		noteRepository:  noteRepository,
+		publiserService: publisherService,
 	}
 }
 
@@ -39,6 +41,19 @@ func (c *noteService) Create(ctx context.Context, req *dto.CreateNoteRequest) (*
 	}
 
 	err := c.noteRepository.Create(ctx, &note)
+	if err != nil {
+		return nil, err
+	}
+
+	msgPayload := dto.PublishEmbedNoteMessage{
+		NoteId: note.Id,
+	}
+	msgJson, err := json.Marshal(msgPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.publiserService.Publish(ctx, msgJson)
 	if err != nil {
 		return nil, err
 	}
