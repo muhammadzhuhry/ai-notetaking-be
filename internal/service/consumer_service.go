@@ -7,12 +7,14 @@ import (
 	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/gofiber/fiber/v2/log"
+	"github.com/google/uuid"
 )
 
 type IConsumerService interface {
@@ -22,14 +24,21 @@ type IConsumerService interface {
 type consumerService struct {
 	noteRepository          repository.INoteRepository
 	noteEmbeddingRepository repository.INoteEmbeddingRepository
+	notebookRepository      repository.INotebookRepository
 	pubSub                  *gochannel.GoChannel
 	topicName               string
 }
 
-func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository) IConsumerService {
+func NewConsumerService(
+	pubSub *gochannel.GoChannel,
+	topicName string, noteRepository repository.INoteRepository,
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
+	notebookRepository repository.INotebookRepository,
+) IConsumerService {
 	return &consumerService{
 		noteRepository:          noteRepository,
 		noteEmbeddingRepository: noteEmbeddingRepository,
+		notebookRepository:      notebookRepository,
 		pubSub:                  pubSub,
 		topicName:               topicName,
 	}
@@ -70,14 +79,41 @@ func (cs *consumerService) processMessage(ctx context.Context, msg *message.Mess
 		panic(err)
 	}
 
-	res, err := embedding.GetGeminiEmbedding(os.Getenv("GOOGLE_GEMINI_API_KEY"), note.Content)
+	notebook, err := cs.notebookRepository.GetByID(ctx, note.NotebookId)
+	if err != nil {
+		panic(err)
+	}
+
+	// Enhrichment content
+	noteUpdatedAt := "-"
+	if note.UpdatedAt != nil {
+		noteUpdatedAt = note.UpdatedAt.Format(time.RFC3339)
+	}
+	content := fmt.Sprintf(`
+	Note Title: %s
+	Notebook Title: %s
+
+	%s
+
+	Created At: %s
+	Updated At: %s
+	`,
+		note.Title,
+		notebook.Name,
+		note.Content,
+		note.CreatedAt.Format(time.RFC3339),
+		noteUpdatedAt,
+	)
+
+	// Process embedding
+	res, err := embedding.GetGeminiEmbedding(os.Getenv("GOOGLE_GEMINI_API_KEY"), content)
 	if err != nil {
 		panic(err)
 	}
 
 	entity := &entity.NoteEmbedding{
-		Id:             payload.NoteId,
-		Document:       note.Content,
+		Id:             uuid.New(),
+		Document:       content,
 		EmbeddingValue: res.Embedding.Values,
 		NoteId:         payload.NoteId,
 		CreatedAt:      time.Now(),
