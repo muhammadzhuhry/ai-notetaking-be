@@ -95,6 +95,19 @@ func (c *noteService) Update(ctx context.Context, req *dto.UpdateNoteRequest) (*
 		return nil, err
 	}
 
+	payload := dto.PublishEmbedNoteMessage{
+		NoteId: note.Id,
+	}
+	payloadJson, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.publiserService.Publish(ctx, payloadJson)
+	if err != nil {
+		return nil, err
+	}
+
 	return &dto.UpdateNoteResponse{
 		Id: note.Id,
 	}, nil
