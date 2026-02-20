@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type INoteService interface {
@@ -26,13 +27,20 @@ type noteService struct {
 	noteRepository          repository.INoteRepository
 	noteEmbeddingRepository repository.INoteEmbeddingRepository
 	publiserService         IPublisherService
+	db                      *pgxpool.Pool
 }
 
-func NewNoteService(noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository, publisherService IPublisherService) INoteService {
+func NewNoteService(
+	noteRepository repository.INoteRepository,
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
+	publisherService IPublisherService,
+	db *pgxpool.Pool,
+) INoteService {
 	return &noteService{
 		noteRepository:          noteRepository,
 		noteEmbeddingRepository: noteEmbeddingRepository,
 		publiserService:         publisherService,
+		db:                      db,
 	}
 }
 
@@ -95,6 +103,10 @@ func (c *noteService) Update(ctx context.Context, req *dto.UpdateNoteRequest) (*
 	note.Content = req.Content
 	note.UpdatedAt = &now
 
+	// if req.Content != "" {
+	// 	note.Content = req.Content
+	// }
+
 	err = c.noteRepository.Update(ctx, note)
 	if err != nil {
 		return nil, err
@@ -124,7 +136,25 @@ func (c *noteService) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
-	err = c.noteRepository.Delete(ctx, id)
+	tx, err := c.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	noteRepo := c.noteRepository.UsingTx(ctx, tx)
+	noteEmbeddingRepo := c.noteEmbeddingRepository.UsingTx(ctx, tx)
+	err = noteRepo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	err = noteEmbeddingRepo.DeleteByNoteId(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(ctx)
 	if err != nil {
 		return err
 	}
@@ -143,6 +173,19 @@ func (c *noteService) MoveNote(ctx context.Context, req *dto.MoveNoteRequest) (*
 	note.UpdatedAt = &now
 
 	err = c.noteRepository.Update(ctx, note)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := dto.PublishEmbedNoteMessage{
+		NoteId: note.Id,
+	}
+	payloadJson, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.publiserService.Publish(ctx, payloadJson)
 	if err != nil {
 		return nil, err
 	}
