@@ -37,13 +37,14 @@ func main() {
 	watermillLogger := watermill.NewStdLogger(false, false)
 	pubSub := gochannel.NewGoChannel(gochannel.Config{}, watermillLogger)
 	publisherService := service.NewPublisherService(
-		"embed-note-content",
+		os.Getenv("EMBED_NOTE_CONTENT_TOPIC"),
 		pubSub,
 	)
 
 	consumerService := service.NewConsumerService(
 		pubSub,
-		"embed-note-content",
+		os.Getenv("EMBED_NOTE_CONTENT_TOPIC"),
+		noteRepository,
 	)
 
 	exampleService := service.NewExampleService(exampleRepository)
