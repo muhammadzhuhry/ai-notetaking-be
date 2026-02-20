@@ -30,7 +30,7 @@ type EmbeddingResponse struct {
 	Embedding EmbeddingResponseEmbedding `json:"embedding"`
 }
 
-func GetGeminiEmbedding(apiKey string, text string) (*EmbeddingResponse, error) {
+func GetGeminiEmbedding(apiKey, text, taskType string) (*EmbeddingResponse, error) {
 
 	geminiReq := EmbeddingRequest{
 		Model: "models/gemini-embedding-001",
@@ -41,7 +41,7 @@ func GetGeminiEmbedding(apiKey string, text string) (*EmbeddingResponse, error) 
 				},
 			},
 		},
-		TaskType: "RETRIEVAL_DOCUMENT",
+		TaskType: taskType,
 	}
 
 	geminiReqJson, err := json.Marshal(geminiReq)
