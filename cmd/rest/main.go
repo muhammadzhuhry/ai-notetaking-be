@@ -47,6 +47,7 @@ func main() {
 		os.Getenv("EMBED_NOTE_CONTENT_TOPIC"),
 		noteRepository,
 		noteEmbeddingRepository,
+		notebookRepository,
 	)
 
 	exampleService := service.NewExampleService(exampleRepository)
