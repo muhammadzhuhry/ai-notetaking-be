@@ -2,12 +2,13 @@ package service
 
 import (
 	"ai-notetaking-be/internal/dto"
+	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
 	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
@@ -19,16 +20,18 @@ type IConsumerService interface {
 }
 
 type consumerService struct {
-	noteRepository repository.INoteRepository
-	pubSub         *gochannel.GoChannel
-	topicName      string
+	noteRepository          repository.INoteRepository
+	noteEmbeddingRepository repository.INoteEmbeddingRepository
+	pubSub                  *gochannel.GoChannel
+	topicName               string
 }
 
-func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, noteRepository repository.INoteRepository) IConsumerService {
+func NewConsumerService(pubSub *gochannel.GoChannel, topicName string, noteRepository repository.INoteRepository, noteEmbeddingRepository repository.INoteEmbeddingRepository) IConsumerService {
 	return &consumerService{
-		noteRepository: noteRepository,
-		pubSub:         pubSub,
-		topicName:      topicName,
+		noteRepository:          noteRepository,
+		noteEmbeddingRepository: noteEmbeddingRepository,
+		pubSub:                  pubSub,
+		topicName:               topicName,
 	}
 }
 
@@ -72,6 +75,18 @@ func (cs *consumerService) processMessage(ctx context.Context, msg *message.Mess
 		panic(err)
 	}
 
-	fmt.Println(res.Embedding.Values)
+	entity := &entity.NoteEmbedding{
+		Id:             payload.NoteId,
+		Document:       note.Content,
+		EmbeddingValue: res.Embedding.Values,
+		NoteId:         payload.NoteId,
+		CreatedAt:      time.Now(),
+	}
+
+	err = cs.noteEmbeddingRepository.Create(ctx, entity)
+	if err != nil {
+		panic(err)
+	}
+
 	msg.Ack()
 }
