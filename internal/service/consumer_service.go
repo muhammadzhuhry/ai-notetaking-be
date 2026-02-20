@@ -3,40 +3,16 @@ package service
 import (
 	"ai-notetaking-be/internal/dto"
 	"ai-notetaking-be/internal/repository"
-	"bytes"
+	"ai-notetaking-be/pkg/embedding"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/gofiber/fiber/v2/log"
 )
-
-type EmbeddingRequestContentPart struct {
-	Text string `json:"text"`
-}
-
-type EmbeddingRequestContent struct {
-	Parts []EmbeddingRequestContentPart `json:"parts"`
-}
-
-type EmbeddingRequest struct {
-	Model    string                  `json:"model"`
-	Content  EmbeddingRequestContent `json:"content"`
-	TaskType string                  `json:"task_type"`
-}
-
-type EmbeddingResponseEmbedding struct {
-	Values []float32 `json:"values"`
-}
-
-type EmbeddingResponse struct {
-	Embedding EmbeddingResponseEmbedding `json:"embedding"`
-}
 
 type IConsumerService interface {
 	Consume(ctx context.Context) error
@@ -91,56 +67,11 @@ func (cs *consumerService) processMessage(ctx context.Context, msg *message.Mess
 		panic(err)
 	}
 
-	geminiReq := EmbeddingRequest{
-		Model: "models/gemini-embedding-001",
-		Content: EmbeddingRequestContent{
-			Parts: []EmbeddingRequestContentPart{
-				{
-					Text: note.Content,
-				},
-			},
-		},
-		TaskType: "RETRIEVAL_DOCUMENT",
-	}
-
-	geminiReqJson, err := json.Marshal(geminiReq)
+	res, err := embedding.GetGeminiEmbedding(os.Getenv("GOOGLE_GEMINI_API_KEY"), note.Content)
 	if err != nil {
 		panic(err)
 	}
 
-	req, err := http.NewRequest(
-		"POST",
-		"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
-		bytes.NewBuffer(geminiReqJson),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header.Set("x-goog-api-key", os.Getenv("GOOGLE_GEMINI_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	resByte, err := io.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		panic(fmt.Errorf("error from response, code %d body %s", res.StatusCode, string(resByte)))
-	}
-
-	var resEmbedding EmbeddingResponse
-	err = json.Unmarshal(resByte, &resEmbedding)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(resEmbedding.Embedding.Values)
+	fmt.Println(res.Embedding.Values)
 	msg.Ack()
 }
