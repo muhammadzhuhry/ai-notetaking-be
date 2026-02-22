@@ -46,22 +46,25 @@ func (cs *chatbotService) CreateSession(ctx context.Context) (*dto.CreateChatSes
 		CreatedAt: now,
 	}
 	chatMessage := entity.ChatMessage{
-		Id:        uuid.New(),
-		Chat:      "Hi, how can i help you?",
-		Role:      constant.ChatRoleModel,
-		CreatedAt: now,
+		Id:            uuid.New(),
+		Chat:          "Hi, how can i help you?",
+		Role:          constant.ChatRoleModel,
+		ChatSessionId: chatSession.Id,
+		CreatedAt:     now,
 	}
 	chatMessageRawUser := entity.ChatMessageRaw{
-		Id:        uuid.New(),
-		Chat:      constant.ChatRawInitialUserPromptV1,
-		Role:      constant.ChatRoleUser,
-		CreatedAt: now,
+		Id:            uuid.New(),
+		Chat:          constant.ChatRawInitialUserPromptV1,
+		Role:          constant.ChatRoleUser,
+		ChatSessionId: chatSession.Id,
+		CreatedAt:     now,
 	}
 	chatMessageRawModel := entity.ChatMessageRaw{
-		Id:        uuid.New(),
-		Chat:      constant.ChatRawInitialModelPromptV1,
-		Role:      constant.ChatRoleModel,
-		CreatedAt: now.Add(1 * time.Second),
+		Id:            uuid.New(),
+		Chat:          constant.ChatRawInitialModelPromptV1,
+		ChatSessionId: chatSession.Id,
+		Role:          constant.ChatRoleModel,
+		CreatedAt:     now.Add(1 * time.Second),
 	}
 
 	tx, err := cs.db.Begin(ctx)
