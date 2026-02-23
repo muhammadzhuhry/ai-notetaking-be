@@ -5,11 +5,14 @@ import (
 	"ai-notetaking-be/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type IchatbotController interface {
 	RegisterRoutes(r fiber.Router)
 	CreateSession(ctx *fiber.Ctx) error
+	GetAllSession(ctx *fiber.Ctx) error
+	GetChatHistory(ctx *fiber.Ctx) error
 }
 
 type chatbotController struct {
@@ -24,7 +27,9 @@ func NewChatbotController(chatbotService service.IChatbotService) IchatbotContro
 
 func (c *chatbotController) RegisterRoutes(r fiber.Router) {
 	h := r.Group("/chatbot/v1")
+	h.Get("/sessions", c.GetAllSession)
 	h.Post("/create-session", c.CreateSession)
+	h.Get("/chat-history", c.GetChatHistory)
 }
 
 func (c *chatbotController) CreateSession(ctx *fiber.Ctx) error {
@@ -34,4 +39,25 @@ func (c *chatbotController) CreateSession(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(serverutils.SuccessResponse("Success create session", res))
+}
+
+func (c *chatbotController) GetAllSession(ctx *fiber.Ctx) error {
+	res, err := c.chatbotService.GetAllSession(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse("Success get all session", res))
+}
+
+func (c *chatbotController) GetChatHistory(ctx *fiber.Ctx) error {
+	idStr := ctx.Query("chat_session_id")
+	sessionId, _ := uuid.Parse(idStr)
+
+	res, err := c.chatbotService.GetChatHistory(ctx.Context(), sessionId)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(serverutils.SuccessResponse("Success get chat history", res))
 }
