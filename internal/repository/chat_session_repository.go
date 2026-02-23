@@ -14,6 +14,7 @@ type IChatSessionRepository interface {
 	Create(ctx context.Context, chatSession *entity.ChatSession) error
 	GetAll(ctx context.Context) ([]*entity.ChatSession, error)
 	GetById(ctx context.Context, id uuid.UUID) (*entity.ChatSession, error)
+	Update(ctx context.Context, chatSession *entity.ChatSession) error
 }
 
 type chatSessionRepository struct {
@@ -94,4 +95,18 @@ func (cs *chatSessionRepository) GetById(ctx context.Context, id uuid.UUID) (*en
 		return nil, err
 	}
 	return &chatSession, nil
+}
+
+func (cs *chatSessionRepository) Update(ctx context.Context, chatSession *entity.ChatSession) error {
+	_, err := cs.db.Exec(
+		ctx,
+		`UPDATE chat_session SET title = $1, updated_at = $2 WHERE id = $3`,
+		chatSession.Title,
+		chatSession.UpdatedAt,
+		chatSession.Id,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
