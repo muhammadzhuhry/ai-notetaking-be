@@ -62,6 +62,7 @@ func main() {
 		chatSessionRepository,
 		chatMessageRepository,
 		chatMessageRawRepository,
+		noteEmbeddingRepository,
 	)
 
 	exampleController := controller.NewExampleController(exampleService)
