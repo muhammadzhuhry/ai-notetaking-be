@@ -6,7 +6,9 @@ import (
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
 	"ai-notetaking-be/pkg/chatbot"
+	"ai-notetaking-be/pkg/embedding"
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -27,6 +29,7 @@ type chatbotService struct {
 	chatSessionRepository    repository.IChatSessionRepository
 	chatMessageRepository    repository.IChatMessageRepository
 	chatMessageRawRepository repository.IChatMessageRawRepository
+	noteEmbeddingRepository  repository.INoteEmbeddingRepository
 }
 
 func NewChatbotService(
@@ -34,12 +37,14 @@ func NewChatbotService(
 	chatSessionRepository repository.IChatSessionRepository,
 	chatMessageRepository repository.IChatMessageRepository,
 	chatMessageRawRepository repository.IChatMessageRawRepository,
+	noteEmbeddingRepository repository.INoteEmbeddingRepository,
 ) IChatbotService {
 	return &chatbotService{
 		db:                       db,
 		chatSessionRepository:    chatSessionRepository,
 		chatMessageRepository:    chatMessageRepository,
 		chatMessageRawRepository: chatMessageRawRepository,
+		noteEmbeddingRepository:  noteEmbeddingRepository,
 	}
 }
 
@@ -168,6 +173,7 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 	chatSessionRepo := cs.chatSessionRepository.UsingTx(ctx, tx)
 	chatMessageRepo := cs.chatMessageRepository.UsingTx(ctx, tx)
 	chatMessageRawRepo := cs.chatMessageRawRepository.UsingTx(ctx, tx)
+	noteEmbeddingRepo := cs.noteEmbeddingRepository.UsingTx(ctx, tx)
 
 	chatSession, err := chatSessionRepo.GetById(ctx, request.ChatSessionId)
 	if err != nil {
@@ -191,7 +197,28 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 		CreatedAt:     now,
 	}
 
+	embeddingRes, err := embedding.GetGeminiEmbedding(
+		os.Getenv("GOOGLE_GEMINI_API_KEY"),
+		request.Chat,
+		"RETRIEVAL_QUERY",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	noteEmbeddings, err := noteEmbeddingRepo.SearchSimilarity(ctx, embeddingRes.Embedding.Values)
+	if err != nil {
+		return nil, err
+	}
+
 	strBuilder := strings.Builder{}
+
+	for i, noteEmbedding := range noteEmbeddings {
+		strBuilder.WriteString(fmt.Sprintf("Reference %d\n", i+1))
+		strBuilder.WriteString(noteEmbedding.Document)
+		strBuilder.WriteString("\n\n")
+	}
+
 	strBuilder.WriteString("User next question: ")
 	strBuilder.WriteString(request.Chat)
 	strBuilder.WriteString("\n\n")
