@@ -14,6 +14,8 @@ import (
 
 type IChatbotService interface {
 	CreateSession(ctx context.Context) (*dto.CreateChatSessionResponse, error)
+	GetAllSession(ctx context.Context) ([]*dto.GetAllSessionResponse, error)
+	GetChatHistory(ctx context.Context, sessionId uuid.UUID) ([]*dto.GetChatHistoryResponse, error)
 }
 
 type chatbotService struct {
@@ -99,7 +101,54 @@ func (cs *chatbotService) CreateSession(ctx context.Context) (*dto.CreateChatSes
 		return nil, err
 	}
 
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &dto.CreateChatSessionResponse{
 		Id: chatSession.Id,
 	}, nil
+}
+
+func (cs *chatbotService) GetAllSession(ctx context.Context) ([]*dto.GetAllSessionResponse, error) {
+	chats, err := cs.chatSessionRepository.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]*dto.GetAllSessionResponse, 0)
+
+	for _, chat := range chats {
+		response = append(response, &dto.GetAllSessionResponse{
+			Id:        chat.Id,
+			Title:     chat.Title,
+			CreatedAt: chat.CreatedAt,
+			UpdatedAt: chat.UpdatedAt,
+		})
+	}
+	return response, nil
+}
+
+func (cs *chatbotService) GetChatHistory(ctx context.Context, sessionId uuid.UUID) ([]*dto.GetChatHistoryResponse, error) {
+	_, err := cs.chatSessionRepository.GetById(ctx, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	chatMessages, err := cs.chatMessageRepository.GetChatBySessionId(ctx, sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]*dto.GetChatHistoryResponse, 0)
+	for _, message := range chatMessages {
+		response = append(response, &dto.GetChatHistoryResponse{
+			Id:        message.Id,
+			Role:      message.Role,
+			Chat:      message.Chat,
+			CreatedAt: message.CreatedAt,
+		})
+	}
+	return response, nil
 }
