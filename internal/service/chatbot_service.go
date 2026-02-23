@@ -5,7 +5,10 @@ import (
 	"ai-notetaking-be/internal/dto"
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/internal/repository"
+	"ai-notetaking-be/pkg/chatbot"
 	"context"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -180,7 +183,6 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 
 	now := time.Now()
 
-	// TODO: save user to chat db
 	chatMessage := entity.ChatMessage{
 		Id:            uuid.New(),
 		Chat:          request.Chat,
@@ -188,25 +190,53 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 		ChatSessionId: chatSession.Id,
 		CreatedAt:     now,
 	}
+
+	strBuilder := strings.Builder{}
+	strBuilder.WriteString("User next question: ")
+	strBuilder.WriteString(request.Chat)
+	strBuilder.WriteString("\n\n")
+	strBuilder.WriteString("Your answer ?")
 	chatMessageRaw := entity.ChatMessageRaw{
 		Id:            uuid.New(),
-		Chat:          request.Chat,
+		Chat:          strBuilder.String(),
 		Role:          constant.ChatRoleUser,
 		ChatSessionId: chatSession.Id,
 		CreatedAt:     now.Add(1 * time.Millisecond),
 	}
 
-	// TODO: save dummy model to chat db
+	existingRawChats = append(
+		existingRawChats,
+		&chatMessageRaw,
+	)
+
+	geminiReq := make([]*chatbot.ChatHistory, 0)
+	for _, existing := range existingRawChats {
+		geminiReq = append(geminiReq, &chatbot.ChatHistory{
+			Chat: existing.Chat,
+			Role: existing.Role,
+		})
+	}
+
+	reply, err := chatbot.GetGeminiResponse(
+		ctx,
+		os.Getenv("GOOGLE_GEMINI_API_KEY"),
+		geminiReq,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	chatMessageModel := entity.ChatMessage{
 		Id:            uuid.New(),
-		Chat:          "This is automated dummy response",
+		Chat:          reply,
 		Role:          constant.ChatRoleModel,
 		ChatSessionId: chatSession.Id,
 		CreatedAt:     now.Add(1 * time.Millisecond),
 	}
+
 	chatMessageModelRaw := entity.ChatMessageRaw{
 		Id:            uuid.New(),
-		Chat:          "This is automated dummy response",
+		Chat:          reply,
 		Role:          constant.ChatRoleModel,
 		ChatSessionId: chatSession.Id,
 		CreatedAt:     now.Add(1 * time.Millisecond),
