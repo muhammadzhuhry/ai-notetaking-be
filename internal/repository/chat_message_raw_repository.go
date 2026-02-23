@@ -5,12 +5,14 @@ import (
 	"ai-notetaking-be/pkg/database"
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type IChatMessageRawRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IChatMessageRawRepository
 	Create(ctx context.Context, chatMessage *entity.ChatMessageRaw) error
+	GetChatBySessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessageRaw, error)
 }
 
 type chatMessageRawRepository struct {
@@ -46,4 +48,34 @@ func (cm *chatMessageRawRepository) Create(ctx context.Context, chatMessage *ent
 		return err
 	}
 	return nil
+}
+
+func (cm *chatMessageRawRepository) GetChatBySessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessageRaw, error) {
+	rows, err := cm.db.Query(
+		ctx,
+		`SELECT id, role, chat, chat_session_id, created_at, updated_at, deleted_at, is_deleted FROM chat_message_raw WHERE chat_session_id = $1 AND is_deleted = false ORDER BY created_at ASC`,
+		sessionId,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*entity.ChatMessageRaw, 0)
+	for rows.Next() {
+		var chatMessageRaw entity.ChatMessageRaw
+		if err := rows.Scan(
+			&chatMessageRaw.Id,
+			&chatMessageRaw.Role,
+			&chatMessageRaw.Chat,
+			&chatMessageRaw.ChatSessionId,
+			&chatMessageRaw.CreatedAt,
+			&chatMessageRaw.UpdatedAt,
+			&chatMessageRaw.DeletedAt,
+			&chatMessageRaw.IsDeleted,
+		); err != nil {
+			return nil, err
+		}
+		res = append(res, &chatMessageRaw)
+	}
+	return res, nil
 }
