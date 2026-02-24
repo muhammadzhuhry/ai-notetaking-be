@@ -14,4 +14,11 @@ const (
 	and I will indicate if I do not have enough information to answer. 
 	I will also adapt my responses to the language you use in your subsquent turns. 
 	I will not refer to the refrences by their numbers \n `
+
+	DecideUseRAGMessageRAWInitialUserPromptV1 = `You are a chatbot assistant that will answer your user question based on references provided.
+	In this session, you will provide true or false data. True if you can answer directly withour other information, false otherwise.`
+
+	DecideUseRAGMessageRAWInitialModelPromptV1 = `Okay, I understand. I will answer \"True\" if I can definitively answer the user's question
+	based solely on my existing knowledge, and \"False\" if I cannot. I will not attempt to make educated guesses or provided pottiently information.
+	I will wait for your question. \n`
 )
