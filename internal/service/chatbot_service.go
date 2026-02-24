@@ -22,6 +22,7 @@ type IChatbotService interface {
 	GetAllSession(ctx context.Context) ([]*dto.GetAllSessionResponse, error)
 	GetChatHistory(ctx context.Context, sessionId uuid.UUID) ([]*dto.GetChatHistoryResponse, error)
 	SendChat(ctx context.Context, request dto.SendChatRequest) (*dto.SendChatResponse, error)
+	DeleteSession(ctx context.Context, request *dto.DeleteSessionRequest) error
 }
 
 type chatbotService struct {
@@ -145,7 +146,7 @@ func (cs *chatbotService) GetChatHistory(ctx context.Context, sessionId uuid.UUI
 		return nil, err
 	}
 
-	chatMessages, err := cs.chatMessageRepository.GetChatBySessionId(ctx, sessionId)
+	chatMessages, err := cs.chatMessageRepository.GetByChatSessionId(ctx, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 		return nil, err
 	}
 
-	existingRawChats, err := chatMessageRawRepo.GetChatBySessionId(ctx, request.ChatSessionId)
+	existingRawChats, err := chatMessageRawRepo.GetByChatSessionId(ctx, request.ChatSessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -338,4 +339,44 @@ func (cs *chatbotService) SendChat(ctx context.Context, request dto.SendChatRequ
 			CreatedAt: chatMessageModel.CreatedAt,
 		},
 	}, nil
+}
+
+func (cs *chatbotService) DeleteSession(ctx context.Context, request *dto.DeleteSessionRequest) error {
+
+	tx, err := cs.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	chatSessionRepo := cs.chatSessionRepository.UsingTx(ctx, tx)
+	chatMessageRepo := cs.chatMessageRepository.UsingTx(ctx, tx)
+	chatMessageRawRepo := cs.chatMessageRawRepository.UsingTx(ctx, tx)
+
+	_, err = chatSessionRepo.GetById(ctx, request.ChatSessionId)
+	if err != nil {
+		return err
+	}
+
+	err = chatSessionRepo.Delete(ctx, request.ChatSessionId)
+	if err != nil {
+		return err
+	}
+
+	err = chatMessageRepo.DeleteByChatSessionId(ctx, request.ChatSessionId)
+	if err != nil {
+		return err
+	}
+
+	err = chatMessageRawRepo.DeleteByChatSessionId(ctx, request.ChatSessionId)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
