@@ -4,6 +4,7 @@ import (
 	"ai-notetaking-be/internal/entity"
 	"ai-notetaking-be/pkg/database"
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,7 +13,8 @@ import (
 type IChatMessageRepository interface {
 	UsingTx(ctx context.Context, tx database.DatabaseQueryer) IChatMessageRepository
 	Create(ctx context.Context, chatMessage *entity.ChatMessage) error
-	GetChatBySessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessage, error)
+	GetByChatSessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessage, error)
+	DeleteByChatSessionId(ctx context.Context, sessionId uuid.UUID) error
 }
 
 type chatMessageRepository struct {
@@ -50,7 +52,7 @@ func (cm *chatMessageRepository) Create(ctx context.Context, chatMessage *entity
 	return nil
 }
 
-func (cm *chatMessageRepository) GetChatBySessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessage, error) {
+func (cm *chatMessageRepository) GetByChatSessionId(ctx context.Context, sessionId uuid.UUID) ([]*entity.ChatMessage, error) {
 	rows, err := cm.db.Query(
 		ctx,
 		`SELECT id, role, chat, chat_session_id, created_at, updated_at, deleted_at, is_deleted FROM chat_message WHERE chat_session_id = $1 AND is_deleted = false ORDER BY created_at ASC`,
@@ -78,4 +80,18 @@ func (cm *chatMessageRepository) GetChatBySessionId(ctx context.Context, session
 		res = append(res, &chatMessage)
 	}
 	return res, nil
+}
+
+func (cm *chatMessageRepository) DeleteByChatSessionId(ctx context.Context, sessionId uuid.UUID) error {
+	_, err := cm.db.Exec(
+		ctx,
+		`UPDATE chat_message SET deleted_at = $1, is_deleted = true WHERE chat_session_id = $2`,
+		time.Now(),
+		sessionId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
